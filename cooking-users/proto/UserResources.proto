@@ -1,5 +1,5 @@
 syntax = "proto3";
-package twitch.twirp.example.helloworld;
+package cooking.users.resources;
 option go_package = "cooking-users";
 
 service UserResources {
