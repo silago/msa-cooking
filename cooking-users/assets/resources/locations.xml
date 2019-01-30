@@ -1,0 +1,16 @@
+<config>
+    <locations>
+        <location name="bakery" level="bakery_level" key="bakery_unlock">
+            <upgrade name="bun_level"></upgrade>
+        </location>
+        <location name="russian_kitchen" level="russian_kitchen_level" coins="2000" key="russian_kitchen_unlock">
+            <req gt="stars" val="15"></req>
+        </location>
+        <location name="stars" level="burgers_level" coins="2000" key="burgers_unlock">
+            <req gt="coins" val="3"></req>
+        </location>
+        <location name="burgers" level="burgers_level" coins="2000" key="burgers_unlock">
+            <req gt="stars" val="30"></req>
+        </location>
+    </locations>
+</config>
