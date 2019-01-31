@@ -19,6 +19,7 @@ type UserResourceServer struct {
 
 func (u *UserResourceServer) GetUserResource(ctx context.Context, request *cooking_users.ResourceRequest) (*cooking_users.ResourceResponse, error) {
 	data:=u.dataProvider.GetOne(request.UserId,request.Type)
+	log.Printf(" user %s %s = %s",request.UserId,request.Type,data)
 	response:=cooking_users.ResourceResponse{}
 	response.Value=data
 	return &response, nil
@@ -122,7 +123,14 @@ func main() {
 		log.Fatalf("error on location module start {%s}", moduleError.Error())
 	}
 
-	cooking_users.NewUserResourcesServer( &UserResourceServer{}, nil )
+	twirpHandler:=cooking_users.NewUserResourcesServer( &UserResourceServer{dataProvider:userProvider}, nil )
+	mux:=http.NewServeMux()
+	mux.Handle(cooking_users.UserResourcesPathPrefix, twirpHandler)
+	go func() {
+		log.Printf("Twirp listening at %s", ENV("TWIRP_ADDR"))
+		log.Fatal(http.ListenAndServe(ENV("TWIRP_ADDR"), mux))
+	}()
+
 
 	log.Println("listening at", ENV("HOST"))
 	log.Fatal(http.ListenAndServe(ENV("HOST"), nil))

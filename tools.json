@@ -1,0 +1,9 @@
+{
+  "Tools": [
+    {
+      "Repository": "github.com/twitchtv/twirp/protoc-gen-twirp",
+      "Commit": "3b7987b1a81780060352721385655fdcbf9c12da"
+    }
+  ],
+  "RetoolVersion": "1.3.7"
+}

@@ -44,6 +44,8 @@ type AuthRequest struct {
 	SessionKey    string `json:"session_key,omitempty"`
 	SessionSecret string `json:"session_secret,omitempty"`
 	SessionToken string `json:"session_token,omitempty"`
+	UserId string `json:"user_id,omitempty"`
+	AuthKey string `json:"auth_key,omitempty"`
 }
 
 type UserService struct {
@@ -66,12 +68,14 @@ func GetAuthenticator(request AuthRequest) socialAuth.AuthProvider {
 		authenticator = socialAuth.NewOkAuthProvider(ENV("APP_ID"),request.SessionKey,request.SessionSecret)
 		break
 	case "vk":
-		authenticator = socialAuth.NewVkAuthProvider(request.SessionToken)
+		log.Printf("%s",request)
+		authenticator = socialAuth.NewVkAuthProvider(request.UserId,request.AuthKey, ENV("VK_SERVICE_KEY"))
 		break
 
 	}
 	return authenticator;
 }
+
 
 
 func (service *UserService) Auth() func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +91,7 @@ func (service *UserService) Auth() func(w http.ResponseWriter, r *http.Request) 
 		platformUser, err := authenticator.Auth()
 		if err != nil {
 			log.Printf("[ERROR] error: {%s}", err.Error())
-			_, _ = w.Write([]byte("{\"error\":\"ok_auth failed \"}"))
+			_, _ = w.Write([]byte("{\"error\":\"auth failed \"}"))
 			return
 		}
 
@@ -103,7 +107,7 @@ func (service *UserService) Auth() func(w http.ResponseWriter, r *http.Request) 
 		if err == nil {
 			if user, err := service.userProvider.GetOrCreate(platformUser.Uid, map[string]interface{}{"username": platformUser.FirstName + " " + platformUser.LastName}); err == nil {
 				rating := user.Params["user_rating"]
-				infoMessage, _ := json.Marshal(map[string]interface{}{"user_id": platformUser.Uid, "username": platformUser.FirstName + " " + platformUser.LastName, "pic": platformUser.PicBase, "rating": strconv.Itoa(rating.(int))})
+				infoMessage, _ := json.Marshal(map[string]interface{}{"user_id": platformUser.Uid, "username": platformUser.FirstName + " " + platformUser.LastName, "pic": platformUser.PicBase, "rating": rating})
 				natsErr := service.nats.Publish(USER_INFO_CHANNEL, NatsMessage{UserId: platformUser.Uid, Message: string(infoMessage)})
 				paramsMessage, _ := json.Marshal(user.Params)
 				log.Printf("params message: %v", user.Params)

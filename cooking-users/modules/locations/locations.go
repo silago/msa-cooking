@@ -114,6 +114,7 @@ type LocationsModule struct {
 	 Provider user_data_providers.UserDataProvider
 }
 
+
 func (module *LocationsModule) Unlock (userId string, requestData LocationUpgradeRequest)  string {
 	config:=module.Config
 	provider:=module.Provider
