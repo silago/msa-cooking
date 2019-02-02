@@ -119,7 +119,7 @@ func TestUnlock(t *testing.T) {
 		t.Errorf("%s ", err.Error())
 	}
 
-	testProvider:=NewTestDataProvider();
+	testProvider:=NewTestDataProvider()
 	locationsModule:= locations.LocationsModule{config, testProvider}
 	result:=locationsModule.Unlock(TEST_USER_ID,locations.LocationUnlockRequest{
 		LocationName: "stars", ResourceName: "coins",

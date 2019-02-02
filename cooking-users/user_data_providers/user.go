@@ -51,10 +51,10 @@ func (u *User) SetDefault() {
 		"topping_strawberry_level": 0,
 		"coffee_level": 1,
 		"coffee_machine_level": 1,
-		"candy": 5,
+		"candy": DEFAULT_CANDIES_COUNT,
 		"stars": 0,
-		"coins": 0,
-		"crystals": 0,
+		"coins": DEFAULT_COINS_COUNT,
+		"crystals": DEFAULT_CRYSTAL_COUNT,
 		"bakery_level": 0,
 
 	}
