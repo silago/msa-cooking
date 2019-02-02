@@ -33,6 +33,8 @@ func (module *LocationsModule) Upgrade (userId string, requestData ItemUpgradeRe
 				break
 			}
 		}
+
+
 		if lastAvailableState == nil {
 			return ResponseMessage("no upgrades available").AsJsonError()
 		}

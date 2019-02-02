@@ -74,7 +74,7 @@ const Ge RequirementType = "Ge"
 
 func (r *Requirement) Compare(value int) bool {
 	requirement:=r.ToInt()
-	log.Printf("comparing %s:  %d(%s) %s %d(%s)",r.GetName(),value,"value", r.GetType(), requirement,"requirement")
+	//log.Printf("comparing %s:  %d(%s) %s %d(%s)",r.GetName(),value,"value", r.GetType(), requirement,"requirement")
 	switch r.GetType() {
 		case Gt:
 			return value > requirement

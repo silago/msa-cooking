@@ -8,7 +8,7 @@ import (
 type ResponseMessage string
 const  (
 	EmptyConditionText    ResponseMessage = "Condition is empty"
-	NotEnoughResourceText ResponseMessage = "Not Enough Resource"
+	NotEnoughResourceText ResponseMessage = "not enough resource"
 	DecodeError           ResponseMessage = "Decode error"
 	EncodeError           ResponseMessage = "Encode error"
 	DatabaseError         ResponseMessage = "Database error"
@@ -26,17 +26,16 @@ func (s ResponseMessage) ToString(params... interface{} ) string {
 	return fmt.Sprintf(string(s), params...)
 }
 
-func (s ResponseMessage) AsJsonError(params... interface{} ) string {
+func (s ResponseMessage) AsJsonError() string {
 	response, _:= json.Marshal(map[string]string{
-		"error": fmt.Sprintf(string(s)),
+		"error": string(s),
 	})
 	return string(response)
 }
 
 type LocationUnlockRequest struct {
 	LocationName string `json:"location"`
-	UpgradeName string  `json:"item"`
-	ResourceName string `json:"currency"`
+	ResourceName string `json:"resource"`
 }
 
 type LocationUnlockResponse struct {

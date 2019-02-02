@@ -1,0 +1,26 @@
+<config>
+    <locations>
+        <location name="bakery" level="bakery_level" key="bakery_unlock">
+            <upgrade name="baker" title="Печка" producers="baker">
+                <state recomended="true" coins="100" crystals="10">
+                    <req ge="baker_level" val="1"></req>
+                </state>
+                <state coins="2400" crystals="20">
+                    <req ge="baker_level" val="2"></req>
+                </state>
+                <state coins="2400" crystals="30">
+                    <req ge="baker_level" val="3"></req>
+                </state>
+            </upgrade>
+        </location>
+        <location name="russian_kitchen" level="russian_kitchen_level" coins="2000" key="russian_kitchen_unlock">
+            <req gt="stars" val="15"></req>
+        </location>
+        <location name="stars" level="burgers_level" coins="2000" key="burgers_unlock">
+            <req gt="coins" val="3"></req>
+        </location>
+        <location name="burgers" level="burgers_level" coins="2000" key="burgers_unlock">
+            <req gt="stars" val="30"></req>
+        </location>
+    </locations>
+</config>
