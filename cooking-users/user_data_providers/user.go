@@ -11,7 +11,7 @@ type User struct {
 const (
 	DEFAULT_CANDIES_COUNT = "5"
 	DEFAULT_CRYSTAL_COUNT = "100"
-	DEFAULT_COINS_COUNT   = "3000"
+	DEFAULT_COINS_COUNT   = "30000"
 )
 
 func (u *User) Fill(data map[string]string) {

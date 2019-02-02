@@ -35,14 +35,12 @@ func (s *UserProvider) DecrementOne(userId string, resourceName string, value in
 	}
 
 	current, _:= strconv.Atoi(s.GetOne(userId, resourceName))
-
-
 	if current < val {
-		return string(current), errors.New("not enough resources")
+		return strconv.Itoa(current), errors.New("ot enough resources")
 	} else {
-		newVal:=string(current-val)
+		newVal:=int(current-val)
 		e:= s.SetOne(userId, resourceName, newVal)
-		return newVal, e
+		return strconv.Itoa(newVal), e
 	}
 
 
@@ -75,8 +73,19 @@ func (s *UserProvider) IncrementOne(userId string, k string, v interface{}) ( st
 
 func (s *UserProvider) IncrementMany(userId string, data map[string]interface{}) error {
 	if len(data) != 0 {
+
 		for k, v := range data {
-			if _, err := s.Client.HIncrByFloat(DbKey+userId, k, v.(float64)).Result(); err!=nil {
+			var value float64
+			switch v.(type) {
+				case int64:
+					value = v.(float64)
+				case int:
+					value = float64(v.(int))
+				case string:
+					value,_ = strconv.ParseFloat(v.(string),64)
+			}
+
+			if _, err := s.Client.HIncrByFloat(DbKey+userId, k, value).Result(); err!=nil {
 				log.Fatalf("Resourcese update error: {%s} ", err.Error())
 				return err
 			}

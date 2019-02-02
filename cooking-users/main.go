@@ -1,4 +1,4 @@
-package main
+package cooking_users
 
 import (
 	"encoding/json"

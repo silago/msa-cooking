@@ -32,7 +32,7 @@ type Location struct {
 	Name        string     `xml:"name,attr"`
 	Level       string     `xml:"level,attr"`
 	Coins       string     `xml:"coins,attr"`
-	Crystals       string     `xml:"crystals,attr"`
+	Crystals    string     `xml:"crystals,attr"`
 	Key         string     `xml:"key,attr"`
 	Requirement Requirement `xml:"req"`
 	Upgrades    []UpgradeItem `xml:"upgrade"`
@@ -45,8 +45,8 @@ type UpgradeItem struct {
 }
 
 type UpgradeState struct {
-	Crystals    string     `xml:"coins,attr"`
-	Coins		string     `xml:"crystals,attr"`
+	Crystals    string     `xml:"crystals,attr"`
+	Coins		string     `xml:"coins,attr"`
 	Requirement Requirement `xml:"req"`
 }
 

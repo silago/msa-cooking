@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/silago/msa-cooking/cooking-users/user_data_providers"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -45,7 +46,7 @@ func (module *LocationsModule) Upgrade (userId string, requestData ItemUpgradeRe
 		}
 
 		if newVal, err := module.Provider.DecrementOne(userId, requestData.ResourceName, upgradeCurrencyValue); err != nil {
-			return ResponseMessage(err.Error() + fmt.Sprintf(" %s , %s ", requestData.ResourceName, upgradeCurrencyValue)).AsJsonError()
+			return ResponseMessage(err.Error() + fmt.Sprintf(" name: %s , current: %s, required: %s ", requestData.ResourceName, newVal, upgradeCurrencyValue)).AsJsonError()
 		} else if err := module.Provider.IncrementMany(userId, map[string]interface{}{
 			requestData.LocationName + "_upgrades": 1,
 			requestData.UpgradeName + "_level":     1,
@@ -69,6 +70,7 @@ func (module *LocationsModule) isRequirementSatisfied(userId string, requirement
 	requirementValue :=requirement.ToInt()
 	if  requirement.Gt!="" {
 		val, err:= strconv.Atoi(module.Provider.GetOne(userId,requirement.Gt))
+		log.Printf("current %s", val )
 		return err==nil && val > requirementValue
 	} else if requirement.Eq!="" {
 		val, err:= strconv.Atoi(module.Provider.GetOne(userId,requirement.Eq))
@@ -84,12 +86,14 @@ func (module *LocationsModule) isRequirementSatisfied(userId string, requirement
 func (module *LocationsModule) Unlock (userId string, requestData LocationUnlockRequest)  string {
 	if location := module.Config.LocationsConfig.GetLocationByName(requestData.LocationName); location !=nil {
 		if !module.isRequirementSatisfied(userId, &location.Requirement)  {
+			log.Printf("requirement %s",location.Requirement)
 			return NotEnoughResourceText.ToString()
 		}
 
 		upgradeCurrencyValue:=location.GetCurrencyByName(requestData.ResourceName);
 		currentCurrencyValue, _:=  strconv.Atoi(module.Provider.GetOne(userId,requestData.ResourceName))
-		if _, err:= module.Provider.DecrementOne(userId, requestData.ResourceName, upgradeCurrencyValue); err!=nil {
+		if current, err:= module.Provider.DecrementOne(userId, requestData.ResourceName, upgradeCurrencyValue); err!=nil {
+			log.Printf("current %s: %s, reqyired: %s",  requestData.ResourceName, current, upgradeCurrencyValue)
 			return ResponseMessage(err.Error()).AsJsonError()
 		} else {
 			return Sucess.MakeJsonResponse(
