@@ -1,157 +1,118 @@
 package locations
 
 import (
-	"cooking-users/user_data_providers"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
+	"github.com/silago/msa-cooking/cooking-users/user_data_providers"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
 	"strconv"
 )
-
-
-type ResponseMessage string
-const  (
-	EmptyConditionText    ResponseMessage = "Condition is empty"
-	NotEnoughResourceText ResponseMessage = "Not Enough Resource"
-	DecodeError ResponseMessage = "Decode error"
-	EncodeError ResponseMessage = "Encode error"
-	DatabaseError ResponseMessage = "Database error"
-	Sucess ResponseMessage = "Success"
-	LocationNotDound ResponseMessage = "Location not found"
-)
-
-func (s ResponseMessage) MakeJsonResponse(params interface{}) string {
-	response, _:= json.Marshal(params)
-	return string(response)
-}
-
-func (s ResponseMessage) ToString(params... interface{} ) string {
-	return fmt.Sprintf(string(s), params...)
-}
-
-func (s ResponseMessage) AsJsonError(params... interface{} ) string {
-	response, _:= json.Marshal(map[string]string{
-		"error": fmt.Sprintf(string(s)),
-	})
-	return string(response)
-}
-
-
-
-func (location *Locations) GetCurrencyByName(name string)  int {
-	switch name {
-		case "coins":
-			val, _ := strconv.Atoi(location.Coins)
-			return val
-		default:
-			return -1
-	}
-}
-
-
-type Config struct {
-	XMLName xml.Name `xml:"config"`
-	LocationsConfig   LocationsConfig   `xml:"locations"`
-}
-
-
-type LocationsConfig struct {
-	XMLName xml.Name `xml:"locations"`
-	Locations   []Locations   `xml:"location"`
-}
-
-type Locations struct {
-	XMLName     xml.Name   `xml:"location"`
-	Name        string     `xml:"name,attr"`
-	Level       string     `xml:"level,attr"`
-	Coins       string     `xml:"coins,attr"`
-	Key         string     `xml:"key,attr"`
-	Requirement Requirement `xml:"req"`
-}
-
-type Requirement struct {
-	Gt     string     `xml:"gt,attr"`
-	Value  string     `xml:"val,attr"`
-}
-
-func (r *Requirement) toInt() int {
-	if val, err := strconv.Atoi(r.Value); err!=nil {
-		log.Printf("cannot decode requirement {%s}", r)
-		return -1
-	} else {
-		return val
-	}
-}
-
-func LoadConfig(path string) ( Config, error ) {
-	xmlFile, err := os.Open(path)
-	var config Config
-
-	if err == nil {
-		defer xmlFile.Close()
-		byteValue, _ := ioutil.ReadAll(xmlFile)
-		err= xml.Unmarshal(byteValue, &config)
-	}
-	return config,  err
-}
-
-type LocationUpgradeRequest struct {
-	LocationName string `json:"location"`
-	ResourceName string `json:"resource"`
-}
-
-type LocationUpgradeResponse struct {
-	success bool
-	msg     string
-}
 
 type LocationsModule struct {
 	 Config   Config
 	 Provider user_data_providers.UserDataProvider
 }
 
-
-func (module *LocationsModule) Unlock (userId string, requestData LocationUpgradeRequest)  string {
-	config:=module.Config
-	provider:=module.Provider
-	for _, location := range config.LocationsConfig.Locations {
-		if location.Name == requestData.LocationName {
-			if location.Requirement.Gt=="" {
-				return EmptyConditionText.ToString();//"Condition Gt is empty"
+func (module *LocationsModule) Upgrade (userId string, requestData ItemUpgradeRequest)  string {
+	if location := module.Config.LocationsConfig.GetLocationByName(requestData.LocationName); location ==nil {
+		return LocationNotFound.AsJsonError()
+	} else if upgrade:=location.GetUpgradeByName(requestData.UpgradeName);  upgrade==nil {
+		return UpgradeNotFound.AsJsonError()
+	} else {
+		requirementsCache := make(map[string]int)
+		var lastAvailableState *UpgradeState = nil
+		for _, state := range upgrade.States {
+			if _, ok := requirementsCache[state.Requirement.GetName()]; !ok {
+				requirementsCache[state.Requirement.GetName()], _ = strconv.Atoi(module.Provider.GetOne(userId, state.Requirement.GetName()))
 			}
-			if val, e := strconv.Atoi(provider.GetOne(userId,location.Requirement.Gt)); e != nil {
-				return DecodeError.ToString();
-			} else if val < location.Requirement.toInt() {
-				return NotEnoughResourceText.ToString()
-			}
-			upgradeCurrencyValue:=location.GetCurrencyByName(requestData.ResourceName);
-			currentCurrencyValue, _:=  strconv.Atoi(provider.GetOne(userId,requestData.ResourceName))
-			if upgradeCurrencyValue<0 || currentCurrencyValue < upgradeCurrencyValue {
-				return NotEnoughResourceText.AsJsonError()
-			}
-			if err:=provider.SetMany(userId, map[string]interface{}{
-				requestData.ResourceName: currentCurrencyValue - upgradeCurrencyValue,
-				location.Key:             true,
-			}); err!=nil {
-				return DatabaseError.AsJsonError();
+			val := requirementsCache[state.Requirement.GetName()]
+			if state.Requirement.Compare(val) == true {
+				lastAvailableState = &state
 			} else {
-				return Sucess.MakeJsonResponse(
-					map[string]interface{}{
-						requestData.ResourceName: currentCurrencyValue - upgradeCurrencyValue,
-						location.Key:             true,
-					}) //{
+				break
 			}
 		}
+		if lastAvailableState == nil {
+			return ResponseMessage("no upgrades available").AsJsonError()
+		}
+
+		upgradeCurrencyValue := lastAvailableState.GetUpgradePriceByName(requestData.ResourceName)
+		if upgradeCurrencyValue == "" {
+			return ResponseMessage("resource not found").AsJsonError()
+		}
+
+		if newVal, err := module.Provider.DecrementOne(userId, requestData.ResourceName, upgradeCurrencyValue); err != nil {
+			return ResponseMessage(err.Error() + fmt.Sprintf(" %s , %s ", requestData.ResourceName, upgradeCurrencyValue)).AsJsonError()
+		} else if err := module.Provider.IncrementMany(userId, map[string]interface{}{
+			requestData.LocationName + "_upgrades": 1,
+			requestData.UpgradeName + "_level":     1,
+		}); err == nil {
+			result:=make(map[string]interface{})
+			data:= module.Provider.GetMany(userId,	[]string {requestData.LocationName + "_upgrades",	requestData.UpgradeName + "_level" } )
+			for k, v:=range data {
+				result[k]=v
+			}
+
+			result[requestData.ResourceName]= newVal;
+			result[location.Key]= true
+			return Sucess.MakeJsonResponse(result)
+		} else {
+			return ResponseMessage(err.Error()).AsJsonError()
+		}
 	}
-	return LocationNotDound.AsJsonError()
 }
 
+func (module *LocationsModule) isRequirementSatisfied(userId string, requirement *Requirement) bool {
+	requirementValue :=requirement.ToInt()
+	if  requirement.Gt!="" {
+		val, err:= strconv.Atoi(module.Provider.GetOne(userId,requirement.Gt))
+		return err==nil && val > requirementValue
+	} else if requirement.Eq!="" {
+		val, err:= strconv.Atoi(module.Provider.GetOne(userId,requirement.Eq))
+		return err==nil && val == requirementValue
+	} else if requirement.Ge!="" {
+		val, err:= strconv.Atoi(module.Provider.GetOne(userId,requirement.Ge))
+		return err==nil && val >= requirementValue
+	} else {
+		return false
+	}
+}
+
+func (module *LocationsModule) Unlock (userId string, requestData LocationUnlockRequest)  string {
+	if location := module.Config.LocationsConfig.GetLocationByName(requestData.LocationName); location !=nil {
+		if !module.isRequirementSatisfied(userId, &location.Requirement)  {
+			return NotEnoughResourceText.ToString()
+		}
+
+		upgradeCurrencyValue:=location.GetCurrencyByName(requestData.ResourceName);
+		currentCurrencyValue, _:=  strconv.Atoi(module.Provider.GetOne(userId,requestData.ResourceName))
+		if _, err:= module.Provider.DecrementOne(userId, requestData.ResourceName, upgradeCurrencyValue); err!=nil {
+			return ResponseMessage(err.Error()).AsJsonError()
+		} else {
+			return Sucess.MakeJsonResponse(
+				map[string]interface{}{
+					requestData.ResourceName: currentCurrencyValue - upgradeCurrencyValue,
+					location.Key:             true,
+				})
+		}
+	}
+	return LocationNotFound.AsJsonError()
+}
+
+func (module *LocationsModule) UpgradeHandler (userId string, request *http.Request)  string {
+	var requestData ItemUpgradeRequest
+	if body, err:= ioutil.ReadAll(request.Body); err==nil {
+		_ = json.Unmarshal(body, &requestData)
+	} else {
+		return err.Error()
+	}
+	return module.Upgrade(userId, requestData)
+}
+
+
 func (module *LocationsModule) UnlockHandler (userId string, request *http.Request)  string {
-		var requestData LocationUpgradeRequest
+		var requestData LocationUnlockRequest
 		if body, err:= ioutil.ReadAll(request.Body); err==nil {
 			_ = json.Unmarshal(body, &requestData)
 		} else {
@@ -160,17 +121,16 @@ func (module *LocationsModule) UnlockHandler (userId string, request *http.Reque
 		return module.Unlock(userId, requestData);
 }
 
-func NewLocationUpdateHandler(configPath string, provider user_data_providers.UserDataProvider) (func (userId string, request *http.Request) string , error) {
+
+
+func NewLocationsModule(configPath string, provider user_data_providers.UserDataProvider) (*LocationsModule, error) {
 	if config, err :=LoadConfig(configPath); err!=nil {
 		panic(fmt.Sprintf("could not load Config {%s}", err.Error()))
 	} else {
 		module:=LocationsModule{config, provider}
-		return module.UnlockHandler, nil;
+		return &module, err;
 	}
 }
-
-
-
 
 
 

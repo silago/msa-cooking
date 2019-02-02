@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	//. "../user_data_providers"
-	providers "cooking-users/user_data_providers"
+	providers "github.com/silago/msa-cooking/cooking-users/user_data_providers"
 )
 
 type NatsMessageType int
@@ -292,7 +292,7 @@ func (service *UserService) Drop() func(w http.ResponseWriter, r *http.Request) 
 				userProvider.DeleteAll(data["id"].(string))
 			}
 		}
-		w.Write([]byte("User dropped"))
+		_, _ = w.Write([]byte("User dropped"))
 	}
 }
 

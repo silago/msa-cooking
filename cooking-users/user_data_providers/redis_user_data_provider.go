@@ -1,8 +1,11 @@
 package user_data_providers
+
 import (
 	"fmt"
 	"github.com/go-redis/redis"
+	"github.com/pkg/errors"
 	"log"
+	"strconv"
 )
 
 
@@ -10,6 +13,39 @@ const DbKey = "GAME:"
 
 type UserProvider struct {
 	Client *redis.Client
+}
+
+func (s *UserProvider) GetMany(userId string, names []string) map[string]string {
+	result:=make(map[string]string)
+	data, _ := s.Client.HGetAll(DbKey + userId).Result()
+	for _,k := range names {
+		result[k]=data[k]
+	}
+	return result
+}
+
+func (s *UserProvider) DecrementOne(userId string, resourceName string, value interface{}) (string, error) {
+	var val int
+	switch value.(type) {
+	case int:
+		val = value.(int)
+		break
+	case string:
+		val, _ = strconv.Atoi(value.(string))
+	}
+
+	current, _:= strconv.Atoi(s.GetOne(userId, resourceName))
+
+
+	if current < val {
+		return string(current), errors.New("not enough resources")
+	} else {
+		newVal:=string(current-val)
+		e:= s.SetOne(userId, resourceName, newVal)
+		return newVal, e
+	}
+
+
 }
 
 func (s *UserProvider) SetOne(userId string, key string, value interface{})   error    {

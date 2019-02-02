@@ -1,68 +1,17 @@
 package main
 
 import (
-	"context"
-	"cooking-users/modules/locations"
-	"cooking-users/proto"
-	"cooking-users/user_data_providers"
-	. "cooking-users/user_service"
 	"encoding/json"
 	"github.com/go-redis/redis"
 	"github.com/nats-io/go-nats"
+	"github.com/silago/msa-cooking/cooking-users/modules/locations"
+	"github.com/silago/msa-cooking/cooking-users/proto"
+	"github.com/silago/msa-cooking/cooking-users/user_data_providers"
+	. "github.com/silago/msa-cooking/cooking-users/user_service"
 	"log"
 	"net/http"
 )
 
-type UserResourceServer struct {
-	dataProvider user_data_providers.UserDataProvider
-}
-
-func (u *UserResourceServer) GetUserResource(ctx context.Context, request *cooking_users.ResourceRequest) (*cooking_users.ResourceResponse, error) {
-	data:=u.dataProvider.GetOne(request.UserId,request.Type)
-	log.Printf(" user %s %s = %s",request.UserId,request.Type,data)
-	response:=cooking_users.ResourceResponse{}
-	response.Value=data
-	return &response, nil
-}
-
-func (u *UserResourceServer) DrawUserResource(ctx context.Context, request *cooking_users.ChangeResourceRequest) (*cooking_users.ChangeResourceResponse, error) {
-	result, err:= u.dataProvider.IncrementOne(request.UserId, request.Type, -request.Count)
-	response:=cooking_users.ChangeResourceResponse{}
-	response.Result = err==nil
-	response.Msg=result
-	return &response,err
-}
-
-func (u *UserResourceServer) UpdateUserResources(ctx context.Context, request *cooking_users.ResourceRequest) (*cooking_users.ResourceResponse, error) {
-	panic("implement me")
-	//	u.dataProvider.SetMany(request.UserId)
-}
-
-func (u *UserResourceServer) AddUserResource(ctx context.Context, request *cooking_users.ChangeResourceRequest) (*cooking_users.ChangeResourceResponse, error) {
-	result, err:= u.dataProvider.IncrementOne(request.UserId, request.Type, request.Count)
-	response:=cooking_users.ChangeResourceResponse{}
-	response.Result = err==nil
-	response.Msg=result
-	return &response,err
-}
-
-func (u *UserResourceServer) AddUserResources(ctx context.Context, request *cooking_users.ChangeResourcesRequest) (*cooking_users.ResourcesResponse, error) {
-	updateData:= make(map[string]interface{})
-	for _, resource :=  range request.Resources {
-		updateData[resource.Type]= resource.Value
-	}
-	if e := u.dataProvider.IncrementMany(request.UserId, updateData); e !=nil {
-		return nil, e
-	} else {
-		response:=cooking_users.ResourcesResponse{}
-		response.Resources = make([]*cooking_users.Resource, len(request.Resources))
-		data:=u.dataProvider.GetAll(request.UserId)
-		for index,resource:=range request.Resources {
-			response.Resources[index]=&cooking_users.Resource{Type:resource.Type,Value:data[resource.Type]}
-		}
-		return &response, nil
-	}
-}
 
 func main() {
 	dbConnection := redis.NewClient(&redis.Options{
@@ -104,23 +53,21 @@ func main() {
 		_, _ = w.Write([]byte("alive"))
 	})
 
-	if locationHandler, moduleError:= locations.NewLocationUpdateHandler("assets/resources/locations.xml", userProvider); moduleError == nil {
-		log.Printf("prepare to handle /game/location/unlock/")
+
+	if locationsModule, moduleError:=locations.NewLocationsModule("assets/resources/locations.xml", userProvider); moduleError!=nil {
+		log.Fatalf("error on location module start {%s}", moduleError.Error())
+	} else {
 		http.HandleFunc("/game/location/unlock/",func(w http.ResponseWriter, r *http.Request) {
-			if userId:= r.Header.Get(USER_ID_HEADER); userId == "" {
-				w.WriteHeader(401)
-				log.Printf("401 ")
-				return
-			} else {
-				result:= locationHandler(userId, r)
-				if _, e:= w.Write([]byte(result)); e!=nil {
-					log.Printf("response write error {%s} " , e.Error())
-				}
+			if userId:= r.Header.Get(USER_ID_HEADER); userId != "" {
+				_, _= w.Write([]byte(locationsModule.UnlockHandler(userId, r)))
 			}
 		})
-		log.Printf("Handling /game/location/unlock/")
-	} else {
-		log.Fatalf("error on location module start {%s}", moduleError.Error())
+
+		http.HandleFunc("/game/location/upgrade/",func(w http.ResponseWriter, r *http.Request) {
+			if userId:= r.Header.Get(USER_ID_HEADER); userId != "" {
+				_, _= w.Write([]byte(locationsModule.UpgradeHandler(userId, r)))
+			}
+		})
 	}
 
 	twirpHandler:=cooking_users.NewUserResourcesServer( &UserResourceServer{dataProvider:userProvider}, nil )
@@ -131,10 +78,10 @@ func main() {
 		log.Fatal(http.ListenAndServe(ENV("TWIRP_ADDR"), mux))
 	}()
 
-
 	log.Println("listening at", ENV("HOST"))
 	log.Fatal(http.ListenAndServe(ENV("HOST"), nil))
 }
+
 
 
 
